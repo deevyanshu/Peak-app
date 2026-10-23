@@ -1,0 +1,147 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: peakdb
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_MULTIPLE_DATABASES: profiledb
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-root} -d ${POSTGRES_DB:-peakdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - backend
+
+  # --- REDIS MASTER ---
+  redis-master:
+    image: redis:7-alpine
+    container_name: redis_master
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-root}
+      --masterauth ${REDIS_PASSWORD:-root}
+      --replica-announce-ip 127.0.0.1
+      --replica-announce-port 6379
+      --appendonly yes
+      --maxmemory 512mb
+      --maxmemory-policy volatile-lru
+    volumes:
+      - redis_master_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-root}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - backend
+
+  # --- REDIS REPLICA (SLAVE) ---
+  redis-replica:
+    image: redis:7-alpine
+    container_name: redis_replica
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6380:6379"
+    command: >
+      redis-server
+      --replicaof redis-master 6379
+      --requirepass ${REDIS_PASSWORD:-root}
+      --masterauth ${REDIS_PASSWORD:-root}
+      --replica-announce-ip 127.0.0.1
+      --replica-announce-port 6380
+      --appendonly yes
+      --maxmemory 512mb
+      --maxmemory-policy volatile-lru
+    volumes:
+      - redis_replica_data:/data
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-root}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - backend
+
+  # --- SENTINEL 1 ---
+  sentinel-1:
+    image: redis:7-alpine
+    container_name: redis_sentinel_1
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:26379:26379"
+    volumes:
+      - ./sentinel.conf:/etc/redis/sentinel.conf
+    command: redis-sentinel /etc/redis/sentinel.conf --sentinel announce-ip 127.0.0.1 --sentinel announce-port 26379
+    depends_on:
+      redis-master:
+        condition: service_healthy
+      redis-replica:
+        condition: service_healthy
+    networks:
+      - backend
+
+  # --- SENTINEL 2 ---
+  sentinel-2:
+    image: redis:7-alpine
+    container_name: redis_sentinel_2
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:26380:26379"
+    volumes:
+      - ./sentinel.conf:/etc/redis/sentinel.conf
+    command: redis-sentinel /etc/redis/sentinel.conf --sentinel announce-ip 127.0.0.1 --sentinel announce-port 26380
+    depends_on:
+      redis-master:
+        condition: service_healthy
+      redis-replica:
+        condition: service_healthy
+    networks:
+      - backend
+
+  # --- SENTINEL 3 ---
+  sentinel-3:
+    image: redis:7-alpine
+    container_name: redis_sentinel_3
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:26381:26379"
+    volumes:
+      - ./sentinel.conf:/etc/redis/sentinel.conf
+    command: redis-sentinel /etc/redis/sentinel.conf --sentinel announce-ip 127.0.0.1 --sentinel announce-port 26381
+    depends_on:
+      redis-master:
+        condition: service_healthy
+      redis-replica:
+        condition: service_healthy
+    networks:
+      - backend
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_master_data:
+    driver: local
+  redis_replica_data:
+    driver: local
+
+networks:
+  backend:
+    driver: bridge
