@@ -33,9 +33,11 @@ public class Profile {
     private String bio;
 
     @Column(name = "profile_name", nullable = false, unique = true)
-    @NotNull
-    @NotBlank
+    @NotNull(message = "Profile name cannot be null")
+    @NotBlank(message = "Profile name cannot be blank")
     private String profileName;
 
+    @NotNull(message = "Privacy cannot be null")
+    @NotBlank(message = "Privacy cannot be blank")
     private Privacy privacy=Privacy.PUBLIC;
 }
