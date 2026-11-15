@@ -20,7 +20,7 @@ import java.util.Map;
 
 @Component
 public class AuthFilter extends AbstractGatewayFilterFactory<AuthFilter.Config> {
-// need to add token in redis and check if it is validated
+
     private final JwtUtil jwtUtil;
 
     private final RedisTemplate<String,Object> redisTemplate;
