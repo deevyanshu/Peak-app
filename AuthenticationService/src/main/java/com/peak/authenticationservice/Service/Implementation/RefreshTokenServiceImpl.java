@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -39,7 +40,9 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     public String createRefreshToken(String userId, String username) {
        String refreshToken = UUID.randomUUID().toString();
         String key="refreshToken:"+refreshToken;
-        Map<String,Object> value=Map.of("userId",userId,"username",username);
+        Map<String,Object> value=new HashMap<>();
+        value.put("userId", userId);
+        value.put("username", username);
         redisTemplate.opsForValue().set(key,value, java.time.Duration.ofMillis(refreshTokenDurationMs));
         return refreshToken;
     }

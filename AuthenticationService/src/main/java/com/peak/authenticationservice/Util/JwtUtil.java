@@ -8,10 +8,12 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -68,25 +70,42 @@ public class JwtUtil {
 //    }
 
     private static PrivateKey loadPrivateKey() throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
-        String key = new String(Files.readAllBytes(Paths.get("src/main/resources/private_key.pem")))
-                .replace("-----BEGIN PRIVATE KEY-----", "")
-                .replace("-----END PRIVATE KEY-----", "")
-                .replaceAll("\\s+", "");
+//        String key = new String(Files.readAllBytes(Paths.get("src/main/resources/private_key.pem")))
+//                .replace("-----BEGIN PRIVATE KEY-----", "")
+//                .replace("-----END PRIVATE KEY-----", "")
+//                .replaceAll("\\s+", "");
 
-        byte[] decoded = Base64.getDecoder().decode(key);
-        PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(decoded);
-        return KeyFactory.getInstance("RSA").generatePrivate(spec);
+        ClassPathResource resource = new ClassPathResource("private_key.pem");
+        try (InputStream inputStream = resource.getInputStream()) {
+            String key = new String(inputStream.readAllBytes())
+                    .replace("-----BEGIN PRIVATE KEY-----", "")
+                    .replace("-----END PRIVATE KEY-----", "")
+                    .replaceAll("\\s+", "");
+
+            byte[] decoded = Base64.getDecoder().decode(key);
+            PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(decoded);
+            return KeyFactory.getInstance("RSA").generatePrivate(spec);
+        }
+
     }
 
     private static PublicKey loadPublicKey() throws IOException, NoSuchAlgorithmException, InvalidKeySpecException {
-        String key=new String(Files.readAllBytes(Paths.get("src/main/resources/public_key.pem")))
-                .replace("-----BEGIN PUBLIC KEY-----", "")
-                .replace("-----END PUBLIC KEY-----", "")
-                .replaceAll("\\s+", "");
+//        String key=new String(Files.readAllBytes(Paths.get("src/main/resources/public_key.pem")))
+//                .replace("-----BEGIN PUBLIC KEY-----", "")
+//                .replace("-----END PUBLIC KEY-----", "")
+//                .replaceAll("\\s+", "");
+        ClassPathResource resource = new ClassPathResource("public_key.pem");
+        try (InputStream inputStream = resource.getInputStream()) {
+            String key = new String(inputStream.readAllBytes())
+                    .replace("-----BEGIN PUBLIC KEY-----", "")
+                    .replace("-----END PUBLIC KEY-----", "")
+                    .replaceAll("\\s+", "");
 
-        byte[] decoded = Base64.getDecoder().decode(key);
-        X509EncodedKeySpec spec = new X509EncodedKeySpec(decoded);
-        return KeyFactory.getInstance("RSA").generatePublic(spec);
+            byte[] decoded = Base64.getDecoder().decode(key);
+            X509EncodedKeySpec spec = new X509EncodedKeySpec(decoded);
+            return KeyFactory.getInstance("RSA").generatePublic(spec);
+        }
+
     }
 
     private Claims getClaims(String token) throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
