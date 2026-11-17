@@ -29,7 +29,7 @@ public class ProfileServiceImpl implements ProfileService {
     private final Storage storage;
 
     @Value("${gcp.bucket.name}")
-    private final String bucketName;
+    private String bucketName;
 
     @Override
     @Transactional
