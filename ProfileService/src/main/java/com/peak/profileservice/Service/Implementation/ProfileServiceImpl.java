@@ -5,6 +5,7 @@ import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.HttpMethod;
 import com.google.cloud.storage.Storage;
 import com.peak.profileservice.Dto.CreateProfileRequestDto;
+import com.peak.profileservice.Dto.ProfileResponseDto;
 import com.peak.profileservice.Entity.Privacy;
 import com.peak.profileservice.Entity.Profile;
 import com.peak.profileservice.ExceptionHandler.BadRequestException;
@@ -28,12 +29,15 @@ public class ProfileServiceImpl implements ProfileService {
     private final ProfileRepository profileRepository;
     private final Storage storage;
 
-    @Value("${gcp.bucket.name}")
-    private String bucketName;
+//    @Value("${gcp.bucket.name}")
+//    private String bucketName;
+    @Value("${gcp.quarantine.bucket.name}")
+    private String quarantineBucketName;
+
 
     @Override
     @Transactional
-    public void createProfile(String userId, CreateProfileRequestDto createProfileRequestDto) {
+    public ProfileResponseDto createProfile(String userId, CreateProfileRequestDto createProfileRequestDto) {
         Profile profile = new Profile();
         profile.setUserId(userId);
         profile.setProfileName(createProfileRequestDto.profileName());
@@ -42,20 +46,17 @@ public class ProfileServiceImpl implements ProfileService {
             profile.setPrivacy(Privacy.PRIVATE);
         }
         profileRepository.save(profile);
+        return new ProfileResponseDto(profile.getProfileName(), profile.getBio(), profile.getProfile_pic_url(), profile.getPrivacy());
     }
 
     @Override
-    @Transactional
-    public void updateProfilePic(String userId, String contentType) {
-        // Define a unique path for the file inside the bucket
-        Profile profile= profileRepository.findById(userId).orElseThrow(() -> new BadRequestException("Profile not found", HttpStatus.NOT_FOUND));
-        String blobName = "profiles/" + userId + "/avatar.jpg";
+    public String updateProfilePic(String userId, String profilePicUrl) {
+        String blobName = "pending/" + userId + "/avatar.jpg";
 
-        BlobId blobId = BlobId.of(bucketName, blobName);
+        BlobId blobId = BlobId.of(quarantineBucketName, blobName);
         BlobInfo blobInfo = BlobInfo.newBuilder(blobId)
-                .setContentType(contentType)
+                .setContentType("image/jpeg")
                 .build();
-
 
         URL signedUrl = storage.signUrl(
                 blobInfo,
@@ -66,20 +67,56 @@ public class ProfileServiceImpl implements ProfileService {
                 Storage.SignUrlOption.withV4Signature()
         );
 
-        // The final URL where the image can be fetched later (assuming public read via CDN/signed read, or public bucket policy for avatars)
-        String publicFileUrl = String.format("https://storage.googleapis.com/%s/%s", bucketName, blobName);
-        profile.setProfile_pic_url(publicFileUrl);
+        return signedUrl.toString();
+    }
+
+//    @Override
+//    @Transactional
+//    public void updateProfilePic(String userId, String contentType) {
+//        // Define a unique path for the file inside the bucket
+//        Profile profile= profileRepository.findById(userId).orElseThrow(() -> new BadRequestException("Profile not found", HttpStatus.NOT_FOUND));
+//        String blobName = "profiles/" + userId + "/avatar.jpg";
+//
+//        BlobId blobId = BlobId.of(bucketName, blobName);
+//        BlobInfo blobInfo = BlobInfo.newBuilder(blobId)
+//                .setContentType(contentType)
+//                .build();
+//
+//
+//        URL signedUrl = storage.signUrl(
+//                blobInfo,
+//                10, // Expiration time
+//                TimeUnit.MINUTES,
+//                Storage.SignUrlOption.httpMethod(HttpMethod.PUT),
+//                Storage.SignUrlOption.withContentType(), // Correct option for enforcing content type
+//                Storage.SignUrlOption.withV4Signature()
+//        );
+//
+//        // The final URL where the image can be fetched later (assuming public read via CDN/signed read, or public bucket policy for avatars)
+//        String publicFileUrl = String.format("https://storage.googleapis.com/%s/%s", bucketName, blobName);
+//        profile.setProfile_pic_url(publicFileUrl);
+//        profileRepository.save(profile);
+//        Map<String, String> response = new HashMap<>();
+//        response.put("uploadUrl", signedUrl.toString());
+//        response.put("fileUrl", publicFileUrl);
+//    }
+
+
+
+    @Override
+    @Transactional
+    public String updateProfileBio(String userId, String profileBio) {
+        Profile profile= profileRepository.findById(userId).orElseThrow(() -> new BadRequestException("Profile not found", HttpStatus.NOT_FOUND));
+        profile.setBio(profileBio);
         profileRepository.save(profile);
-        Map<String, String> response = new HashMap<>();
-        response.put("uploadUrl", signedUrl.toString());
-        response.put("fileUrl", publicFileUrl);
+        return profileBio;
     }
 
     @Override
     @Transactional
-    public void updateProfileBio(String userId, String profileBio) {
+    public void saveProfilePic(String userId, String profilePicUrl) {
         Profile profile= profileRepository.findById(userId).orElseThrow(() -> new BadRequestException("Profile not found", HttpStatus.NOT_FOUND));
-        profile.setBio(profileBio);
+        profile.setProfile_pic_url(profilePicUrl);
         profileRepository.save(profile);
     }
 }

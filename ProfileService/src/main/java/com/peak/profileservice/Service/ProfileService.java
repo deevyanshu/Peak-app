@@ -1,13 +1,15 @@
 package com.peak.profileservice.Service;
 
 import com.peak.profileservice.Dto.CreateProfileRequestDto;
+import com.peak.profileservice.Dto.ProfileResponseDto;
 
 public interface ProfileService {
 
-    public void createProfile(String userId, CreateProfileRequestDto createProfileRequestDto);
+    public ProfileResponseDto createProfile(String userId, CreateProfileRequestDto createProfileRequestDto);
 
-    public void updateProfilePic(String userId, String profilePicUrl);
+    public String updateProfilePic(String userId, String profilePicUrl);
 
-    public void updateProfileBio(String userId, String profileBio);
+    public String updateProfileBio(String userId, String profileBio);
 
+    public void saveProfilePic(String userId, String profilePicUrl);
 }
