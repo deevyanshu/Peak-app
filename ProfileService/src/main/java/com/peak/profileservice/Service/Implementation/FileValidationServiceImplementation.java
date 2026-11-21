@@ -1,18 +1,28 @@
-package com.peak.filevalidationservice.Service;
+package com.peak.profileservice.Service.Implementation;
 
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.Storage;
+import com.peak.profileservice.Entity.ProcessPubsubEvents;
+import com.peak.profileservice.Repository.ProcessPubsubEventsRepository;
+import com.peak.profileservice.Service.FileValidationService;
+import com.peak.profileservice.Service.ProfileService;
+import jakarta.transaction.Transactional;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Async;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class FileValidationService {
+public class FileValidationServiceImplementation implements FileValidationService {
 
     private final Storage storage;
+
+    private final ProfileService profileService;
+
+    private final ProcessPubsubEventsRepository pubsubEventsRepository;
 
     @Value("${gcp.bucket.name}")
     private String productionBucket;
@@ -20,13 +30,21 @@ public class FileValidationService {
     @Value("${gcp.quarantine.bucket.name}")
     private String quarantineBucket;
 
-    @Async("TaskExecutor")
-    public void validateAndPromoteFile(String blobName, String userId) {
+    @Override
+    @Transactional
+    public void validateAndPromoteFile(String messageId, String blobName, String userId) {
+
+        if(messageId!=null && pubsubEventsRepository.existsById(messageId)){
+            return; // Duplicate message, already processed
+        }
+
         BlobId sourceId = BlobId.of(quarantineBucket, blobName);
         Blob blob = storage.get(sourceId);
 
         if (blob == null || !blob.exists()) {
+            recordProcessedEvent(messageId, blobName);
             return; // File not found in quarantine
+
         }
 
         byte[] contentBytes = blob.getContent();
@@ -34,6 +52,7 @@ public class FileValidationService {
         if (isMaliciousOrInvalidImage(contentBytes)) {
             // Security fail: delete fake/malicious file immediately
             storage.delete(sourceId);
+            recordProcessedEvent(messageId, blobName);
             //send notification to be implemented
             return;
         }
@@ -50,7 +69,8 @@ public class FileValidationService {
 
         // Save public file URL to PostgreSQL using the userId
         String finalPublicUrl = String.format("https://storage.googleapis.com/%s/%s", productionBucket, targetBlobName);
-        // send using kafka
+        profileService.saveProfilePic(userId, finalPublicUrl);
+        recordProcessedEvent(messageId, blobName);
     }
 
     private boolean isMaliciousOrInvalidImage(byte[] fileBytes) {
@@ -60,5 +80,16 @@ public class FileValidationService {
         boolean isPng = (fileBytes[0] == (byte) 0x89 && fileBytes[1] == (byte) 0x50 && fileBytes[2] == (byte) 0x4E && fileBytes[3] == (byte) 0x47);
 
         return !isJpeg && !isPng;
+    }
+
+    private void recordProcessedEvent(String messageId, String blobName) {
+        if (messageId == null || messageId.isBlank()) {
+            return;
+        }
+        try {
+            pubsubEventsRepository.saveAndFlush(new ProcessPubsubEvents(messageId, blobName));
+        } catch (DataIntegrityViolationException ignored) {
+            // Another retry already inserted this messageId — safe to ignore
+        }
     }
 }

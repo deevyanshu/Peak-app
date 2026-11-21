@@ -38,4 +38,10 @@ public class ProfileServiceController {
     public ResponseEntity<String> updateProfilePic(@RequestHeader("userId") String userId, @RequestBody String profilePicUrl) {
         return ResponseEntity.ok(profileService.updateProfilePic(userId, profilePicUrl));
     }
+
+    @PostMapping("/saveProfilePicUrl")
+    public ResponseEntity<Void> saveProfilePicUrl(@RequestHeader("userId") String userId, @RequestBody String profilePicUrl) {
+        profileService.saveProfilePic(userId, profilePicUrl);
+        return ResponseEntity.ok().build();
+    }
 }
