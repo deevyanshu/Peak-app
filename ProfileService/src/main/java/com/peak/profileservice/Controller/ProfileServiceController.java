@@ -7,10 +7,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController("/api/v1/profile")
 @RequiredArgsConstructor
@@ -18,7 +15,6 @@ public class ProfileServiceController {
     // Need to create:-
     /*
     1. Search service with elastic search
-    2. quarantine cloud storage
     3. debezium for profile service to search service
     */
     private final ProfileService profileService;
@@ -29,7 +25,7 @@ public class ProfileServiceController {
         return new ResponseEntity<>(profileService.createProfile(userId, createProfileRequestDto), HttpStatus.CREATED);
     }
 
-    @PostMapping("/updateProfileBio")
+    @PutMapping("/updateProfileBio")
     public ResponseEntity<String> updateProfileBio(@RequestHeader("userId") String userId, @RequestBody String profileBio) {
         return ResponseEntity.ok(profileService.updateProfileBio(userId, profileBio));
     }
@@ -39,9 +35,9 @@ public class ProfileServiceController {
         return ResponseEntity.ok(profileService.updateProfilePic(userId, profilePicUrl));
     }
 
-    @PostMapping("/saveProfilePicUrl")
-    public ResponseEntity<Void> saveProfilePicUrl(@RequestHeader("userId") String userId, @RequestBody String profilePicUrl) {
-        profileService.saveProfilePic(userId, profilePicUrl);
-        return ResponseEntity.ok().build();
-    }
+//    @PostMapping("/saveProfilePicUrl")
+//    public ResponseEntity<Void> saveProfilePicUrl(@RequestHeader("userId") String userId, @RequestBody String profilePicUrl) {
+//        profileService.saveProfilePic(userId, profilePicUrl);
+//        return ResponseEntity.ok().build();
+//    }
 }

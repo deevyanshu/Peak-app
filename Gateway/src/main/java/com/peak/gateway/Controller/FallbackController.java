@@ -14,4 +14,9 @@ public class FallbackController {
     public Mono<ResponseEntity<String>> authServiceFallback(){
         return Mono.just(ResponseEntity.status(503).body("Authentication Service is currently unavailable. Please try again later."));
     }
+
+    @RequestMapping("/profileFallback")
+    public Mono<ResponseEntity<String>> profileServiceFallback(){
+        return Mono.just(ResponseEntity.status(503).body("Profile Service is currently unavailable. Please try again later."));
+    }
 }

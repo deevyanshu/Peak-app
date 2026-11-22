@@ -29,6 +29,18 @@ spring:
                   args:
                     name: authCircuitBreaker
                     fallbackUri: forward:/fallback/authFallback
+
+            - id: PROFILE-SERVICE
+              uri: lb://PROFILE-SERVICE
+              predicates:
+                - Path=/api/v1/profile/**
+              filters:
+                - AuthFilter
+                - name: CircuitBreaker
+                  args:
+                    name: profileCircuitBreaker
+                    fallbackUri: forward:/fallback/profileFallback
+
   data:
     redis:
       sentinel:
@@ -40,8 +52,8 @@ spring:
 
 resilience4j:
   circuitbreaker:
-    instances:
-      authCircuitBreaker:
+    configs:
+      default:
         registerHealthIndicator: true
         slidingWindowSize: 10
         minimumNumberOfCalls: 5
@@ -50,10 +62,17 @@ resilience4j:
         permittedNumberOfCallsInHalfOpenState: 3
         automaticTransitionFromOpenToHalfOpenEnabled: true
         slidingWindowType: COUNT_BASED
+    instances:
+      authCircuitBreaker: {}
+      profileCircuitBreaker: {}
+
 
   timelimiter:
     instances:
       authCircuitBreaker:
+        timeoutDuration: 5s
+        cancelRunningFuture: true
+      profileCircuitBreaker:
         timeoutDuration: 5s
         cancelRunningFuture: true
 
