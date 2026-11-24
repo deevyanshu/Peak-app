@@ -51,7 +51,7 @@ public class ProfileServiceImpl implements ProfileService {
 
     @Override
     public String updateProfilePic(String userId, String profilePicUrl) {
-        String blobName = "pending/" + userId + "/avatar.jpg";
+        String blobName = "pending/" + userId + "/" + profilePicUrl;
 
         BlobId blobId = BlobId.of(quarantineBucketName, blobName);
         BlobInfo blobInfo = BlobInfo.newBuilder(blobId)

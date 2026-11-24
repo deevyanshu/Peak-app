@@ -15,6 +15,7 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -59,7 +60,7 @@ public class AuthFilter extends AbstractGatewayFilterFactory<AuthFilter.Config> 
                             .header("userId", value.get("userId"))
                             .header("roles", value.get("roles"))
                             .build();
-                    redisTemplate.opsForValue().set(tokenKey + token, value, 1000 *60 *5);
+                    redisTemplate.opsForValue().set(tokenKey + token, value, Duration.ofMinutes(10));
                 }else {
                     @SuppressWarnings("unchecked")
                     Map<String,String> value=(Map<String,String>) redisTemplate.opsForValue().get(tokenKey + token);
@@ -75,7 +76,7 @@ public class AuthFilter extends AbstractGatewayFilterFactory<AuthFilter.Config> 
                 return chain.filter(exchange.mutate().request(modifiedRequest).build());
 
             }catch (Exception e){
-                return onError(exchange, "Unauthorized access", HttpStatus.UNAUTHORIZED);
+                return onError(exchange, "Unauthorized access through exception: " + e.getMessage(), HttpStatus.UNAUTHORIZED);
             }
         };
     }

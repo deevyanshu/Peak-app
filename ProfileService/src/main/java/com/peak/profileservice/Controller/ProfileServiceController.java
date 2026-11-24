@@ -9,12 +9,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-@RestController("/api/v1/profile")
+@RestController
+@RequestMapping("/api/v1/profile")
 @RequiredArgsConstructor
 public class ProfileServiceController {
     // Need to create:-
     /*
     1. Search service with elastic search
+    2. Bloom filter
     3. debezium for profile service to search service
     */
     private final ProfileService profileService;

@@ -58,7 +58,8 @@ public class FileValidationServiceImplementation implements FileValidationServic
         }
 
         // Validation pass: Build target path using the userId
-        String targetBlobName = "profiles/" + userId + "/avatar.jpg";
+        String[] parts = blobName.split("/");
+        String targetBlobName = "profiles/" + userId + "/" + parts[parts.length - 1];
         BlobId targetId = BlobId.of(productionBucket, targetBlobName);
 
         // Copy to production public bucket

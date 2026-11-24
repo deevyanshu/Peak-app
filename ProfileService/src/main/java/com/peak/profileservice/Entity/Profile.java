@@ -35,7 +35,6 @@ public class Profile {
     private String profileName;
 
     @NotNull(message = "Privacy cannot be null")
-    @NotBlank(message = "Privacy cannot be blank")
     @Enumerated(EnumType.STRING)
     private Privacy privacy=Privacy.PUBLIC;
 }

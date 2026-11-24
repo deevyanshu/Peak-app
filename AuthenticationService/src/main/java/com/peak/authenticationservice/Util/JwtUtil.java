@@ -58,7 +58,7 @@ public class JwtUtil {
                 .toList();
         Map<String, Object> claims = Map.of("roles", roleNames,"userId",user.getUserId());
         return Jwts.builder().claims(claims).subject(username).issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 5))
+                .expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 10)) // 10 minutes
                 .signWith(privateKey).compact();
     }
 

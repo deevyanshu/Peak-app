@@ -24,8 +24,8 @@ public class LoginLimiterService {
     private BucketConfiguration createNewBucket() {
         // Allows a max capacity of 5 tokens, refilling 5 tokens every 10 minutes.
         Bandwidth limit = Bandwidth.builder()
-                .capacity(2)
-                .refillIntervally(3, Duration.ofMinutes(10))
+                .capacity(5)
+                .refillIntervally(5, Duration.ofMinutes(10))
                 .build();
 
         return BucketConfiguration.builder()

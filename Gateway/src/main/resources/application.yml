@@ -43,6 +43,7 @@ spring:
 
   data:
     redis:
+      password: root
       sentinel:
         master: mymaster
         nodes:
