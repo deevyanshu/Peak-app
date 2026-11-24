@@ -3,16 +3,15 @@ package com.peak.profileservice.Service.Implementation;
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.Storage;
-import com.peak.profileservice.Entity.ProcessPubsubEvents;
-import com.peak.profileservice.Repository.ProcessPubsubEventsRepository;
 import com.peak.profileservice.Service.FileValidationService;
 import com.peak.profileservice.Service.ProfileService;
 import jakarta.transaction.Transactional;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+
+import java.time.Duration;
 
 @Service
 @RequiredArgsConstructor
@@ -22,7 +21,9 @@ public class FileValidationServiceImplementation implements FileValidationServic
 
     private final ProfileService profileService;
 
-    private final ProcessPubsubEventsRepository pubsubEventsRepository;
+    private static final Duration DEDUP_TTL=Duration.ofDays(7);
+    private static final String KEY_PREFIX="pubsub:processed";
+    private final RedisTemplate<String, String> redisTemplate;
 
     @Value("${gcp.bucket.name}")
     private String productionBucket;
@@ -33,45 +34,66 @@ public class FileValidationServiceImplementation implements FileValidationServic
     @Override
     @Transactional
     public void validateAndPromoteFile(String messageId, String blobName, String userId) {
+        String dedupKey = (messageId != null && !messageId.isBlank())
+                ? KEY_PREFIX + messageId
+                : null;
 
-        if(messageId!=null && pubsubEventsRepository.existsById(messageId)){
-            return; // Duplicate message, already processed
+//        if(messageId!=null && pubsubEventsRepository.existsById(messageId)){
+//            return; // Duplicate message, already processed
+//        }
+
+        if(dedupKey!=null)
+        {
+            Boolean acquired=redisTemplate.opsForValue().setIfAbsent(dedupKey, blobName,DEDUP_TTL);
+            if(Boolean.FALSE.equals(acquired))
+            {
+                return; // Duplicate message, already processed
+            }
         }
 
-        BlobId sourceId = BlobId.of(quarantineBucket, blobName);
-        Blob blob = storage.get(sourceId);
+        try{
+            BlobId sourceId = BlobId.of(quarantineBucket, blobName);
+            Blob blob = storage.get(sourceId);
 
-        if (blob == null || !blob.exists()) {
-            recordProcessedEvent(messageId, blobName);
-            return; // File not found in quarantine
+            if (blob == null || !blob.exists()) {
+                //recordProcessedEvent(messageId, blobName);
+                return; // File not found in quarantine
 
-        }
+            }
 
-        byte[] contentBytes = blob.getContent();
+            byte[] contentBytes = blob.getContent();
 
-        if (isMaliciousOrInvalidImage(contentBytes)) {
-            // Security fail: delete fake/malicious file immediately
+            if (isMaliciousOrInvalidImage(contentBytes)) {
+                // Security fail: delete fake/malicious file immediately
+                storage.delete(sourceId);
+                //recordProcessedEvent(messageId, blobName);
+                //send notification to be implemented
+                return;
+            }
+
+            // Validation pass: Build target path using the userId
+            String[] parts = blobName.split("/");
+            String targetBlobName = "profiles/" + userId + "/" + parts[parts.length - 1];
+            BlobId targetId = BlobId.of(productionBucket, targetBlobName);
+
+            // Copy to production public bucket
+            storage.copy(Storage.CopyRequest.newBuilder().setSource(sourceId).setTarget(targetId).build());
+
+            // Clean up quarantine file
             storage.delete(sourceId);
-            recordProcessedEvent(messageId, blobName);
-            //send notification to be implemented
-            return;
+
+            // Save public file URL to PostgreSQL using the userId
+            String finalPublicUrl = String.format("https://storage.googleapis.com/%s/%s", productionBucket, targetBlobName);
+            profileService.saveProfilePic(userId, finalPublicUrl);
+        }catch (Exception ex){
+            if(dedupKey!=null)
+            {
+                redisTemplate.delete(dedupKey);
+            }
+            throw ex;
         }
 
-        // Validation pass: Build target path using the userId
-        String[] parts = blobName.split("/");
-        String targetBlobName = "profiles/" + userId + "/" + parts[parts.length - 1];
-        BlobId targetId = BlobId.of(productionBucket, targetBlobName);
-
-        // Copy to production public bucket
-        storage.copy(Storage.CopyRequest.newBuilder().setSource(sourceId).setTarget(targetId).build());
-
-        // Clean up quarantine file
-        storage.delete(sourceId);
-
-        // Save public file URL to PostgreSQL using the userId
-        String finalPublicUrl = String.format("https://storage.googleapis.com/%s/%s", productionBucket, targetBlobName);
-        profileService.saveProfilePic(userId, finalPublicUrl);
-        recordProcessedEvent(messageId, blobName);
+        //recordProcessedEvent(messageId, blobName);
     }
 
     private boolean isMaliciousOrInvalidImage(byte[] fileBytes) {
@@ -83,14 +105,14 @@ public class FileValidationServiceImplementation implements FileValidationServic
         return !isJpeg && !isPng;
     }
 
-    private void recordProcessedEvent(String messageId, String blobName) {
-        if (messageId == null || messageId.isBlank()) {
-            return;
-        }
-        try {
-            pubsubEventsRepository.saveAndFlush(new ProcessPubsubEvents(messageId, blobName));
-        } catch (DataIntegrityViolationException ignored) {
-            // Another retry already inserted this messageId — safe to ignore
-        }
-    }
+//    private void recordProcessedEvent(String messageId, String blobName) {
+//        if (messageId == null || messageId.isBlank()) {
+//            return;
+//        }
+//        try {
+//            pubsubEventsRepository.saveAndFlush(new ProcessPubsubEvents(messageId, blobName));
+//        } catch (DataIntegrityViolationException ignored) {
+//            // Another retry already inserted this messageId — safe to ignore
+//        }
+//    }
 }
