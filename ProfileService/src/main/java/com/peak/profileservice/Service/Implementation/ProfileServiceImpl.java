@@ -119,4 +119,10 @@ public class ProfileServiceImpl implements ProfileService {
         profile.setProfile_pic_url(profilePicUrl);
         profileRepository.save(profile);
     }
+
+    @Override
+    public String getProfilePicUrl(String userId) {
+        Profile profile= profileRepository.findById(userId).orElseThrow(() -> new BadRequestException("Profile not found", HttpStatus.NOT_FOUND));
+        return profile.getProfile_pic_url();
+    }
 }

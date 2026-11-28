@@ -2,6 +2,9 @@ package com.peak.profileservice.GCPSubscriber;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.api.gax.batching.FlowControlSettings;
+import com.google.api.gax.core.ExecutorProvider;
+import com.google.api.gax.core.InstantiatingExecutorProvider;
 import com.google.cloud.pubsub.v1.AckReplyConsumer;
 import com.google.cloud.pubsub.v1.MessageReceiver;
 import com.google.cloud.pubsub.v1.Subscriber;
@@ -23,6 +26,9 @@ public class QuarantinePubSubSubscriber {
 
     private final FileValidationService fileValidationService;
     private final ObjectMapper objectMapper;
+    // implementing executorprovider and flowcontrolsettings to limit the number of concurrent messages being processed and to avoid overwhelming the system with too many messages at once.
+    private final ExecutorProvider executorProvider;
+    private final FlowControlSettings flowControlSettings;
 
     @Value("${spring.cloud.gcp.project-id}")
     private String projectId;
@@ -58,7 +64,10 @@ public class QuarantinePubSubSubscriber {
                 consumer.nack();
             }
         };
-        this.subscriber = Subscriber.newBuilder(projectSubscriptionName, receiver).build();
+        this.subscriber = Subscriber.newBuilder(projectSubscriptionName, receiver).
+        setExecutorProvider(this.executorProvider).
+        setFlowControlSettings(this.flowControlSettings).
+        build();
         this.subscriber.startAsync().awaitRunning();
     }
 
@@ -66,6 +75,9 @@ public class QuarantinePubSubSubscriber {
     public void stopSubscriber() {
         if (subscriber != null) {
             subscriber.stopAsync().awaitTerminated();
+        }
+        if (this.executorProvider != null && this.executorProvider.getExecutor() != null) {
+            this.executorProvider.getExecutor().shutdownNow();
         }
     }
 }

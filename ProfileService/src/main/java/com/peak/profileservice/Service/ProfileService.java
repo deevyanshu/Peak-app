@@ -12,4 +12,6 @@ public interface ProfileService {
     public String updateProfileBio(String userId, String profileBio);
 
     public void saveProfilePic(String userId, String profilePicUrl);
+
+    public String getProfilePicUrl(String userId);
 }
